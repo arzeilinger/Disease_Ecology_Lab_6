@@ -1,0 +1,82 @@
+#### SFSU DISEASE ECOLOGY LAB 6. VECTOR DISEASE MODELS
+
+# load deSolve library
+library(deSolve)
+
+# Numerical simulation of basic SIS model
+# Setting up function with differential equations
+SISvector <- function(dt, inits, parms){
+  with(as.list(c(parms, inits)), {
+    # Specify the model equations
+    dS = -beta*S*V/(S + I) + gamma*I
+    dI = beta*S*V/(S + I) - gamma*I
+    dU = -alpha*U*I/(S + I) + b*U - mu*U
+    dV = alpha*U*I/(S + I) + b*V - mu*V
+    # Specify which variables to output or return from function
+    return(list(c(dS, dI, dU, dV)))
+  })
+}
+
+# Define time period and intervals for simulation
+dt <- seq(0, 150, by = 1)
+
+# Define starting values for state variables
+S0 <- 99 # Susceptible hosts
+I0 <- 1 # Infected hosts
+U0 <- 200 # Susceptible vectors
+V0 <- 0 # Infective vectors
+inits <- c(S = S0, I = I0, U = U0, V = V0) # Concatenate starting values
+
+# Define parameters
+alpha <- 0.5 # acquisition rate
+beta <- 0.6 # inoculation rate
+gamma <- 0.5 # removal rate
+mu <- 0.15 # vector death rate
+b <- 0.1 # vector birth rate
+# Concatenate parameter values into a vector
+parms <- c(alpha = alpha, beta = beta, gamma = gamma, mu = mu, b = b) 
+
+# Numerical simulation
+model.out <- as.data.frame(ode(y = inits, times = dt, func = SISvector,  parms = parms))
+
+# Time series plot
+matplot(model.out[,-1],
+        # Some additional arguments to make the plot look nice
+        type = "l", xlab = "Time", ylab = "Population", 
+        lty = 1:2, col = c("green", "green", "blue", "blue"), lwd = 2)
+legend("topright", c("S", "I", "U", "V"), 
+       lty = 1:2, col = c("green", "green", "blue", "blue"), box.lwd = 0, lwd = 2)
+
+
+##################################################################################
+#### Effect of vector population growth on disease spread
+
+# Vector of birth rates
+bVec <- seq(0, 0.2, by = 0.01)
+
+# Define new time period and intervals for simulation
+dt <- seq(0, 500, by = 1)
+
+# Function to run ode() multiple times and long-term values
+SISVectorFunc <- function(x){
+  # Pass the variable x to the "parms" vector, to represent birth rate values
+  parms <- c(alpha = alpha, beta = beta, gamma = gamma, mu = mu, b = x) 
+  # Run ode() on the SISVector model using the new birth rate value
+  model.out2 <- as.data.frame(ode(y = inits, times = dt, func = SISvector,  parms = parms))
+  # Extract the value for Infected hosts (I) from the last time point (t = 500)
+  # And calculate the % of infected hosts
+  infectFinal <- (model.out2$I[501]/(S0 + I0))*100 # % of host population infected
+  # Return the birth rate value and the % of infected hosts
+  return(c(x, infectFinal))
+}
+
+# Run sapply()
+bResults <- as.data.frame(t(sapply(bVec, SISVectorFunc, simplify = TRUE)))
+names(bResults) <- c("b", "I")
+
+# Plot results
+plot(I ~ b, data = bResults,
+     # More arguments to make the plot look nice
+     type = "b", lwd = 2, col = "green", 
+     ylab = "Percent infected hosts", 
+     xlab = "Vector birth rate (b)")
